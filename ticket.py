@@ -18,24 +18,25 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from fake_useragent import UserAgent
 import undetected_chromedriver as uc
+from selenium.webdriver.common.by import By
 
 ua = UserAgent()
 user_agent = ua.random
 
 if __name__ == "__main__":
     # 保存Cookies
-    driver = uc.Chrome(headless=False, use_subprocess=False)
-    driver.get("https://www.cityline.com")
-    driver.delete_all_cookies()  # 清空初始Cookies[[6]]
-    # 手动登录过程...
-    time.sleep(100)
-    cookies = driver.get_cookies()
-    print(cookies)
-    with open("cityline_cookies.json", "w") as f:
-        json.dump(cookies, f)
-    driver.quit()
+    # driver = uc.Chrome(headless=False, use_subprocess=False)
+    # driver.get("https://www.cityline.com")
+    # driver.delete_all_cookies()  # 清空初始Cookies[[6]]
+    # # 手动登录过程...
+    # time.sleep(100)
+    # cookies = driver.get_cookies()
+    # print(cookies)
+    # with open("cityline_cookies.json", "w") as f:
+    #     json.dump(cookies, f)
+    # driver.quit()
 
-    time.sleep(5)
+    # time.sleep(5)
     # 加载Cookies
     driver = uc.Chrome(headless=False, use_subprocess=False)
 
