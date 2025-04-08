@@ -1,0 +1,7 @@
+[tool.black]
+line-length = 120
+skip-string-normalization = false  # 强制使用双引号
+
+[tool.isort]
+profile = "black"  # 让 isort 兼容 black
+line_length = 120
