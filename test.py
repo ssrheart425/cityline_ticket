@@ -1,32 +1,57 @@
-# from selenium import webdriver
-# from selenium.webdriver.common.by import By
-# from concurrent.futures import ThreadPoolExecutor
-
-# # 创建一个执行任务的函数
-# def fetch_data(url):
-#     driver = webdriver.Chrome()
-#     driver.get(url)
-#     title = driver.title  # 获取页面的标题
-#     print(f"Page title for {url}: {title}")
-#     driver.quit()
-
-# # 定义要抓取的多个URL
-# urls = [
-#     "https://baidu.com",
-#     "https://jd.com",
-#     "https://zhihu.com"
-# ]
-
-# # 使用 ThreadPoolExecutor 来并发执行多个任务
-# with ThreadPoolExecutor(max_workers=3) as executor:
-#     executor.map(fetch_data, urls)
-
-
+import json
 import time
+import os
+import undetected_chromedriver as uc
+from my_logging import logger
+from selenium.webdriver.support.ui import WebDriverWait, Select
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
 
-from selenium import webdriver
 
-driver = webdriver.Chrome()  # 启动谷歌浏览器
-driver.get("http://www.zhihu.com")  # 访问一个网页
-time.sleep(5)
-driver.quit()  # 退出浏览器
+def get_cityline_cookies(browser_id):
+    """
+    获取指定浏览器ID的cookies
+    :param browser_id: 浏览器实例的唯一标识符
+    """
+    driver = uc.Chrome(use_subprocess=False)
+    try:
+        logger.info(f"开始获取浏览器 {browser_id} 的cookies")
+        driver.get("https://www.cityline.com")
+        logger.info("等待手动登录...")
+        login_button = WebDriverWait(driver, 3, 0.1).until(EC.element_to_be_clickable((By.CLASS_NAME, "btn-login")))
+        login_button.click()
+        time.sleep(50)  # 等待手动登录
+
+        # 确保目录存在
+        os.makedirs("user_cookies", exist_ok=True)
+
+        # 获取cookies
+        cookies = driver.get_cookies()
+
+        # 保存cookies到文件
+        cookie_file = f"user_cookies/cityline_cookies_{browser_id}.json"
+        with open(cookie_file, "w") as f:
+            json.dump(cookies, f)
+        logger.info(f"成功保存cookies到 {cookie_file}")
+
+    except Exception as e:
+        logger.error(f"获取cookies时出错: {str(e)}")
+    finally:
+        driver.quit()
+
+
+def main():
+    # 加载配置文件
+    with open("config/config.json", "r") as f:
+        configs = json.load(f)
+
+    # 按顺序处理每个浏览器配置
+    for config in configs:
+        browser_id = config["browser_id"]
+        logger.info(f"开始处理浏览器 {browser_id}")
+        get_cityline_cookies(browser_id)
+        logger.info(f"完成处理浏览器 {browser_id}")
+
+
+if __name__ == "__main__":
+    main()
