@@ -1,10 +1,23 @@
 [
     {
         "browser_id": "ticket1",
-        "keys": "五月天"
+        "keys": "五月天",
+        "ticketPrice": [0,1,8,9],
+        "ticketType": 2,
+        "date":[0]
     },
     {
         "browser_id": "ticket2",
-        "keys": "张学友"
+        "keys": "张学友",
+        "ticketPrice": [0,1,2,3,8],
+        "ticketType": 0,
+        "date":[1]
+    },
+    {
+        "browser_id": "ticket3",
+        "keys": "PINOCCHIOP",
+        "ticketPrice": [0],
+        "ticketType": 1,
+        "date":[1]
     }
 ]
