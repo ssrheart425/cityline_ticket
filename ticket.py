@@ -3,15 +3,17 @@ import os
 import random
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
-
+from concurrent.futures import ProcessPoolExecutor
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
+from twocaptcha import TwoCaptcha
 
 from my_logging import logger
+import requests
+from config import env_config as conf
 
 
 class CityLineTicket:
@@ -24,6 +26,11 @@ class CityLineTicket:
         self.ticket_prices = self.config.get("ticketPrice", [1])
         self.ticket_types = self.config.get("ticketType", 1)
         self.date = self.config.get("date", [0])
+        self.twocaptcha_apikey = conf.twocaptcha_key
+        self.solved_code = None
+        self.css_locator_for_input_send_token = 'input[name="cf-turnstile-response"]'
+        self.iframe = "cf-chl-widget-r3h6d"
+        self.driver_url = None
         logger.info(
             f"初始化CityLineTicket实例 - browser_id: {self.browser_id}, keys: {self.keys}, ticket_prices: {self.ticket_prices}, ticket_types: {self.ticket_types}"
         )
@@ -237,8 +244,55 @@ class CityLineTicket:
             buy_button.click()
         except Exception as e:
             logger.error(f"{self.browser_id} 购买按钮超时未加载出来")
+        time.sleep(10)
+        try:
+            logger.info(f"shadow_host")
+            shadow_host = WebDriverWait(self.driver, 20, 0.1).until(
+                EC.presence_of_element_located(
+                    (By.XPATH, "/html/body/div[1]/section[1]/div/div/div/div[2]/form/div[8]/div[1]/div")
+                )
+            )
+            logger.info(f"执行shadow_root")
+            shadow_root = self.driver.execute_script("return arguments[0].shadowRoot", shadow_host)
+            logger.info(f"执行iframe {shadow_root}")
+            iframe = shadow_root.find_element("id", "cf-chl-widget-r3h6d")
+            # iframe = WebDriverWait(self.driver, 10, 0.1).until(
+            #     EC.presence_of_element_located(("id", "cf-chl-widget-r3h6d"))
+            # )
+            logger.info(f"iframe {iframe}")
+            self.driver.switch_to.frame(iframe)
+            confirm_real_user = WebDriverWait(self.driver, 10, 0.1).until(
+                EC.visibility_of_element_located((By.XPATH, "/html/body//div[1]/div/div[1]/div/label/span[2]"))
+            )
+            self.driver_url = self.driver.current_url
+            if confirm_real_user:
+                logger.info("twocaptcha开始解决turnstile")
+                solver = TwoCaptcha(self.twocaptcha_apikey)
+                try:
+                    result = solver.turnstile(sitekey="0x4AAAAAAAWNjB2Bt2Whyc7f", url=self.driver_url)
+                    logger.info(f"Captcha解决成功!")
+                    self.solved_code = result["code"]
+                    logger.info(f"返回code {self.solved_code}")
+                except Exception as e:
+                    logger.info(f"Captcha错误: {e}")
+            try:
+                twocaptcha_script = f"""
+                    var element = document.querySelector('{self.css_locator_for_input_send_token}');
+                    if (element) {{
+                        element.value = "{self.solved_code}";
+                    }}
+                """
+                logger.info(f"执行script 往input插入code")
+                self.driver.execute_script(twocaptcha_script)
+            except Exception as e:
+                logger.info(f"执行script失败 error:{e}")
+        except Exception as e:
+            logger.info(f"twocaptcha失败 错误或未找到元素: {e}")
+        finally:
+            self.driver.switch_to.default_content()
+        time.sleep(10000)
         logger.info("点击登入按钮")
-        time.sleep(5)
+
         login_button = WebDriverWait(self.driver, 3, 0.1).until(
             EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/section[1]/div/div/div/div[3]/button"))
         )
@@ -452,34 +506,43 @@ class CityLineTicket:
 
 def process_ticket(browser_id):
     """
-    处理单个浏览器的购票流程
+    处理单个浏览器的购票流程（含并发优化）
     :param browser_id: 浏览器实例的唯一标识符
     """
     try:
-        logger.info(f"开始处理浏览器 {browser_id}")
-        cityline_ticket = CityLineTicket(browser_id=browser_id)
-        logger.info(f"成功创建CityLineTicket实例,开始执行购票流程")
+        # 添加随机延迟（2~4秒）缓解并发竞争
+        initial_delay = random.uniform(2, 4)
+        logger.info(f"浏览器 {browser_id} 初始化前等待 {initial_delay:.2f} 秒")
+        time.sleep(initial_delay)
+
+        cityline_ticket = CityLineTicket(browser_id=browser_id)  # 确保类支持该参数
         cityline_ticket.main_process()
     except Exception as e:
         logger.error(f"处理浏览器 {browser_id} 时出错: {str(e)}")
         raise
 
 
-if __name__ == "__main__":
+def main():
     try:
         logger.info("开始加载配置文件")
         with open("config/config.json", "r") as f:
             configs = json.load(f)
             logger.info(f"成功加载配置文件，内容: {configs}")
 
-        # 创建线程池
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            # 启动多个浏览器实例
-            browser_ids = [item["browser_id"] for item in configs]
+        browser_ids = [item["browser_id"] for item in configs]
+
+        # 主进程预先初始化驱动（可选）
+        _preinit_chromedriver()
+
+        with ProcessPoolExecutor(max_workers=3) as executor:
             logger.info(f"准备启动的浏览器ID列表: {browser_ids}")
 
-            futures = [executor.submit(process_ticket, browser_id) for browser_id in browser_ids]
-            logger.info("所有任务已提交到线程池")
+            # 提交任务时添加间隔（建议1~3秒）
+            futures = []
+            for idx, bid in enumerate(browser_ids):
+                futures.append(executor.submit(process_ticket, bid))
+                if idx != len(browser_ids) - 1:  # 最后一个任务不等待
+                    time.sleep(1.5)  # 控制进程启动间隔
 
             # 等待所有任务完成
             for future in futures:
@@ -490,6 +553,23 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"程序执行出错: {str(e)}")
 
+
+def _preinit_chromedriver():
+    """主进程预先初始化驱动确保文件存在"""
+    from undetected_chromedriver import Chrome
+
+    logger.info("预初始化chromedriver...")
+    try:
+        temp_driver = Chrome()
+        temp_driver.quit()
+    except Exception as e:
+        logger.warning(f"预初始化失败: {e}")
+
+
+if __name__ == "__main__":
+    # cityline_ticket = CityLineTicket(browser_id="ticket1")
+    # cityline_ticket.main_process()
+    main()
 
 # if __name__ == "__main__":
 #     cityline_ticket = CityLineTicket(browser_id="ticket1")
