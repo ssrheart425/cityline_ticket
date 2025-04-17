@@ -26,7 +26,7 @@ class CityLineTicket:
         self.ticket_prices = self.config.get("ticketPrice", [1])
         self.ticket_types = self.config.get("ticketType", 1)
         self.date = self.config.get("date", [0])
-        self.twocaptcha_apikey = conf.twocaptcha_key
+        self.twocaptcha_apikey = "41e656550253f552035fb9e1917d59a7"
         self.solved_code = None
         self.css_locator_for_input_send_token = 'input[name="cf-turnstile-response"]'
         self.iframe = "cf-chl-widget-r3h6d"
@@ -232,6 +232,15 @@ class CityLineTicket:
         # 获取当前页面标题
         current_title = self.driver.title
         logger.info(f"当前页面标题: {current_title}")
+        # shadow_root_script = """
+        #         Element.prototype._attachShadow = Element.prototype.attachShadow;
+        #         Element.prototype.attachShadow = function () {
+        #             console.log('attachShadow');
+        #             return this._attachShadow( { mode: "open" } );
+        #         };
+        #     """
+        # # 第一步：全局注入 JS（在任意元素 attachShadow 时将其转为 open 模式）
+        # self.driver.execute_script(shadow_root_script)
         time.sleep(0.5)
         self._retry_button(current_title)
         logger.info("点击购买按钮")
@@ -246,53 +255,48 @@ class CityLineTicket:
             logger.error(f"{self.browser_id} 购买按钮超时未加载出来")
         time.sleep(10)
         try:
-            logger.info(f"shadow_host")
-            shadow_host = WebDriverWait(self.driver, 20, 0.1).until(
+            input_elem = WebDriverWait(self.driver, 10, 0.1).until(
                 EC.presence_of_element_located(
-                    (By.XPATH, "/html/body/div[1]/section[1]/div/div/div/div[2]/form/div[8]/div[1]/div")
+                    (By.XPATH, "/html/body/div[1]/section[1]/div/div/div/div[2]/form/div[8]/div[1]/div/input")
                 )
             )
-            logger.info(f"执行shadow_root")
-            shadow_root = self.driver.execute_script("return arguments[0].shadowRoot", shadow_host)
-            logger.info(f"执行iframe {shadow_root}")
-            iframe = shadow_root.find_element("id", "cf-chl-widget-r3h6d")
-            # iframe = WebDriverWait(self.driver, 10, 0.1).until(
-            #     EC.presence_of_element_located(("id", "cf-chl-widget-r3h6d"))
-            # )
-            logger.info(f"iframe {iframe}")
-            self.driver.switch_to.frame(iframe)
-            confirm_real_user = WebDriverWait(self.driver, 10, 0.1).until(
-                EC.visibility_of_element_located((By.XPATH, "/html/body//div[1]/div/div[1]/div/label/span[2]"))
-            )
-            self.driver_url = self.driver.current_url
-            if confirm_real_user:
+            input_value = input_elem.get_attribute("value")
+            logger.error(f"{input_value} input_value")
+            if not input_value:
+                self.driver_url = self.driver.current_url
                 logger.info("twocaptcha开始解决turnstile")
                 solver = TwoCaptcha(self.twocaptcha_apikey)
-                try:
-                    result = solver.turnstile(sitekey="0x4AAAAAAAWNjB2Bt2Whyc7f", url=self.driver_url)
-                    logger.info(f"Captcha解决成功!")
-                    self.solved_code = result["code"]
-                    logger.info(f"返回code {self.solved_code}")
-                except Exception as e:
-                    logger.info(f"Captcha错误: {e}")
-            try:
-                twocaptcha_script = f"""
-                    var element = document.querySelector('{self.css_locator_for_input_send_token}');
-                    if (element) {{
-                        element.value = "{self.solved_code}";
-                    }}
-                """
+                result = solver.turnstile(sitekey="0x4AAAAAAAWNjB2Bt2Whyc7f", url=self.driver_url)
+                logger.info(f"Captcha解决成功!")
+                self.solved_code = result["code"]
+                logger.info(f"返回code {self.solved_code}")
+                # twocaptcha_script = f"""
+                #     var element = document.querySelector('{self.css_locator_for_input_send_token}');
+                #     if (element) {{
+                #         element.value = "{self.solved_code}";
+                #     }}
+                # """
+                self.driver.execute_script(
+                    """
+                    document.evaluate("//input[@name='cf-turnstile-response']", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)
+                        .singleNodeValue.value = arguments[0];
+                """,
+                    self.solved_code,
+                )
                 logger.info(f"执行script 往input插入code")
-                self.driver.execute_script(twocaptcha_script)
-            except Exception as e:
-                logger.info(f"执行script失败 error:{e}")
+                login_button = WebDriverWait(self.driver, 30, 0.1).until(
+                    EC.visibility_of_element_located(
+                        (By.XPATH, "/html/body/div[1]/section[1]/div/div/div/div[3]/button")
+                    )
+                )
+                self.driver.execute_script("arguments[0].removeAttribute('disabled')", login_button)
+                self.driver.execute_script("arguments[0].style.opacity = '1'", login_button)
+                time.sleep(5)
+                login_button.click()
         except Exception as e:
-            logger.info(f"twocaptcha失败 错误或未找到元素: {e}")
-        finally:
-            self.driver.switch_to.default_content()
+            logger.info(f"Captcha错误: {e}")
         time.sleep(10000)
         logger.info("点击登入按钮")
-
         login_button = WebDriverWait(self.driver, 3, 0.1).until(
             EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/section[1]/div/div/div/div[3]/button"))
         )
