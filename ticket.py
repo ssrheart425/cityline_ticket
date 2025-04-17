@@ -232,15 +232,6 @@ class CityLineTicket:
         # 获取当前页面标题
         current_title = self.driver.title
         logger.info(f"当前页面标题: {current_title}")
-        # shadow_root_script = """
-        #         Element.prototype._attachShadow = Element.prototype.attachShadow;
-        #         Element.prototype.attachShadow = function () {
-        #             console.log('attachShadow');
-        #             return this._attachShadow( { mode: "open" } );
-        #         };
-        #     """
-        # # 第一步：全局注入 JS（在任意元素 attachShadow 时将其转为 open 模式）
-        # self.driver.execute_script(shadow_root_script)
         time.sleep(0.5)
         self._retry_button(current_title)
         logger.info("点击购买按钮")
@@ -270,12 +261,6 @@ class CityLineTicket:
                 logger.info(f"Captcha解决成功!")
                 self.solved_code = result["code"]
                 logger.info(f"返回code {self.solved_code}")
-                # twocaptcha_script = f"""
-                #     var element = document.querySelector('{self.css_locator_for_input_send_token}');
-                #     if (element) {{
-                #         element.value = "{self.solved_code}";
-                #     }}
-                # """
                 self.driver.execute_script(
                     """
                     document.evaluate("//input[@name='cf-turnstile-response']", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)
@@ -289,15 +274,17 @@ class CityLineTicket:
                         (By.XPATH, "/html/body/div[1]/section[1]/div/div/div/div[3]/button")
                     )
                 )
+                logger.info(f"执行script 设置login_button 可见")
                 self.driver.execute_script("arguments[0].removeAttribute('disabled')", login_button)
+                logger.info(f"执行script 设置不透明度为1")
                 self.driver.execute_script("arguments[0].style.opacity = '1'", login_button)
-                time.sleep(5)
+                time.sleep(3)
                 login_button.click()
         except Exception as e:
             logger.info(f"Captcha错误: {e}")
-        time.sleep(10000)
+        time.sleep(3)
         logger.info("点击登入按钮")
-        login_button = WebDriverWait(self.driver, 3, 0.1).until(
+        login_button = WebDriverWait(self.driver, 10, 0.1).until(
             EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/section[1]/div/div/div/div[3]/button"))
         )
         login_button.click()
