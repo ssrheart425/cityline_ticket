@@ -4,6 +4,8 @@ import random
 import threading
 import time
 from concurrent.futures import ProcessPoolExecutor
+
+import requests
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -11,28 +13,33 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
 from twocaptcha import TwoCaptcha
 
-from my_logging import logger
-import requests
 from config import env_config as conf
+from my_logging import logger
 
 
 class CityLineTicket:
 
     def __init__(self, browser_id):
         self.driver = None
+        self.solved_code = None
+        self.driver_url = None
         self.browser_id = browser_id
         self.config = self._load_config()
         self.keys = self.config.get("keys")
-        self.ticket_prices = self.config.get("ticketPrice", [1])
-        self.ticket_types = self.config.get("ticketType", 1)
+        self.ticket_price = self.config.get("ticket_price", [1])
+        self.ticket_type = self.config.get("ticket_type", 1)
         self.date = self.config.get("date", [0])
-        self.twocaptcha_apikey = "41e656550253f552035fb9e1917d59a7"
-        self.solved_code = None
+        self.ticket_password = self.config.get("ticket_password", "123456")
+        self.payment_method = self.config.get("payment_method")
+        self.visa_name = None
+        self.visa_credit_card_number = None
+        self.visa_mm = None
+        self.visa_yy = None
+        self.visa_security_code = None
+        self.twocaptcha_apikey = conf.TWOCAPTCHA_KEY
         self.css_locator_for_input_send_token = 'input[name="cf-turnstile-response"]'
-        self.iframe = "cf-chl-widget-r3h6d"
-        self.driver_url = None
         logger.info(
-            f"初始化CityLineTicket实例 - browser_id: {self.browser_id}, keys: {self.keys}, ticket_prices: {self.ticket_prices}, ticket_types: {self.ticket_types}"
+            f"初始化CityLineTicket实例 - browser_id: {self.browser_id}, keys: {self.keys}, ticket_price: {self.ticket_price}, ticket_type: {self.ticket_type}"
         )
 
     def _load_config(self):
@@ -124,7 +131,14 @@ class CityLineTicket:
         time.sleep(0.5)
         self._select_ticket()
         time.sleep(0.5)
-        self._visa_payment()
+        self._insert_ticket_password()
+        time.sleep(0.5)
+        if self.payment_method == "visa":
+            self._visa_payment()
+        elif self.payment_method == "alipay":
+            self._alipay_payment()
+        time.sleep(0.5)
+        self._checkbox_select()
         time.sleep(30000)
         self.driver.quit()
 
@@ -152,7 +166,7 @@ class CityLineTicket:
     def _search_keyword(self):
         logger.info("搜索关键字")
         first_input_element = self.driver.find_element(
-            By.XPATH, "/html/body/div[1]/div/div[2]/div[4]/div[2]/div/div/span/input"
+            By.XPATH, "//*[@id='app']/div/div[2]/div[4]/div[2]/div/div/span/input"
         )
         first_input_element.send_keys(self.keys)
         first_input_element.send_keys(Keys.RETURN)
@@ -229,6 +243,8 @@ class CityLineTicket:
         logger.info("切换到最新打开的标签页")
         self._switch_to_new_window()
         time.sleep(2)
+        self.driver.save_screenshot(f"screenshot_{self.browser_id}.png")
+
         # 获取当前页面标题
         current_title = self.driver.title
         logger.info(f"当前页面标题: {current_title}")
@@ -246,19 +262,18 @@ class CityLineTicket:
             logger.error(f"{self.browser_id} 购买按钮超时未加载出来")
         time.sleep(10)
         try:
-            input_elem = WebDriverWait(self.driver, 10, 0.1).until(
+            input_ele = WebDriverWait(self.driver, 10, 0.1).until(
                 EC.presence_of_element_located(
                     (By.XPATH, "/html/body/div[1]/section[1]/div/div/div/div[2]/form/div[8]/div[1]/div/input")
                 )
             )
-            input_value = input_elem.get_attribute("value")
-            logger.error(f"{input_value} input_value")
+            input_value = input_ele.get_attribute("value")
             if not input_value:
                 self.driver_url = self.driver.current_url
-                logger.info("twocaptcha开始解决turnstile")
+                logger.info("2captcha开始解决turnstile")
                 solver = TwoCaptcha(self.twocaptcha_apikey)
                 result = solver.turnstile(sitekey="0x4AAAAAAAWNjB2Bt2Whyc7f", url=self.driver_url)
-                logger.info(f"Captcha解决成功!")
+                logger.info(f"2captcha解决成功!")
                 self.solved_code = result["code"]
                 logger.info(f"返回code {self.solved_code}")
                 self.driver.execute_script(
@@ -279,16 +294,27 @@ class CityLineTicket:
                 logger.info(f"执行script 设置不透明度为1")
                 self.driver.execute_script("arguments[0].style.opacity = '1'", login_button)
                 time.sleep(3)
+                logger.info("2captcha完成之后点击登入按钮")
                 login_button.click()
         except Exception as e:
-            logger.info(f"Captcha错误: {e}")
+            logger.info(f"无captcha触发或解决失败: {e}")
+        while True:
+            try:
+                time.sleep(3)
+                login_button.click()
+            except Exception as e:
+                logger.info(f"点击login_button失败")
+                break
         time.sleep(3)
-        logger.info("点击登入按钮")
-        login_button = WebDriverWait(self.driver, 10, 0.1).until(
-            EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/section[1]/div/div/div/div[3]/button"))
-        )
-        login_button.click()
-        time.sleep(2)
+        try:
+            logger.info("点击登入按钮")
+            login_button = WebDriverWait(self.driver, 10, 0.1).until(
+                EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/section[1]/div/div/div/div[3]/button"))
+            )
+            login_button.click()
+        except Exception as e:
+            logger.info(f"没找到登入按钮 继续执行")
+        time.sleep(3)
         logger.info(f"{self.browser_id} 检测模态框是否存在")
         try:
             modal_elements = self.driver.find_elements(By.CSS_SELECTOR, "div.modal-content")
@@ -306,16 +332,16 @@ class CityLineTicket:
     def _select_ticket(self):
         time.sleep(1)
         try:
-            logger.info(f"{self.browser_id} 尝试选择票种: {self.ticket_types}")
+            logger.info(f"{self.browser_id} 尝试选择票种: {self.ticket_type}")
             time.sleep(2)
 
             dropdown_element = self.driver.find_element(By.NAME, f"ticketType0")
             select = Select(dropdown_element)
-            select.select_by_index(self.ticket_types)
+            select.select_by_index(self.ticket_type)
             time.sleep(0.5)
             self._select_date()
             time.sleep(0.5)
-            for ticket_price in self.ticket_prices:
+            for ticket_price in self.ticket_price:
                 try:
                     if ticket_price > 8:
                         logger.info(f"{self.browser_id} 票价编号{ticket_price}大于8，执行向下滚动")
@@ -378,8 +404,6 @@ class CityLineTicket:
             performance_buttons = WebDriverWait(self.driver, 10, 0.5).until(
                 EC.presence_of_all_elements_located((By.CLASS_NAME, "date-box"))
             )
-            logger.info(f"找到的日期按钮: {performance_buttons}")
-
             success = False
             error_messages = []
 
@@ -422,20 +446,51 @@ class CityLineTicket:
             logger.error(f"{self.browser_id} 选择日期失败: {str(e)}")
             raise
 
-    def _visa_payment(self):
+    def _insert_ticket_password(self):
         try:
             time.sleep(2)
             ticket_collection_input1 = WebDriverWait(self.driver, 5, 0.1).until(
                 EC.visibility_of_element_located((By.XPATH, "//*[@id='claimPassword']"))
             )
-            ticket_collection_input1.send_keys("123456")
+            ticket_collection_input1.send_keys(f"{self.ticket_password}")
             ticket_collection_input2 = WebDriverWait(self.driver, 5, 0.1).until(
                 EC.visibility_of_element_located((By.XPATH, "//*[@id='ReTypePwd']"))
             )
-            ticket_collection_input2.send_keys("123456")
+            ticket_collection_input2.send_keys(f"{self.ticket_password}")
         except Exception as e:
             logger.info("取票密码输入框不存在，跳过输入")
+        return
+
+    def _purchase_button_click(self):
+        try:
+            logger.info("点击去付款(确认)按钮")
+            purchase_button = WebDriverWait(self.driver, 3, 0.1).until(
+                EC.element_to_be_clickable((By.XPATH, "//*[@id='proceedDisplay']/form/div[2]/div[30]/button"))
+            )
+            purchase_button.click()
+        except Exception as e:
+            logger.error(f"确认按钮点击失败 error:{e}")
+        return
+
+    def _alipay_payment(self):
+        logger.info("点击支付宝付款方式")
+        try:
+            alipay_button = WebDriverWait(self.driver, 8, 0.1).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, "[data-payment-code='ALIPAY']"))
+            )
+            alipay_button.click()
+            self._purchase_button_click()
+        except Exception as e:
+            logger.error(f"点击支付宝付款失败 error: {e}")
+        return
+
+    def _visa_payment(self):
         logger.info("点击visa付款方式")
+        self.visa_name = self.config.get("visa_name")
+        self.visa_credit_card_number = self.config.get("visa_credit_card_number")
+        self.visa_mm = self.config.get("visa_mm")
+        self.visa_yy = self.config.get("visa_yy")
+        self.visa_security_code = self.config.get("visa_security_code")
         try:
             visa_button = WebDriverWait(self.driver, 8, 0.1).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "[data-payment-code='VISA']"))
@@ -446,29 +501,28 @@ class CityLineTicket:
             visa_name = WebDriverWait(self.driver, 8, 0.1).until(
                 EC.presence_of_element_located((By.XPATH, "//*[@id='holder']"))
             )
-            visa_name.send_keys("heart")
+            visa_name.send_keys(f"{self.visa_name}")
             visa_card_number = WebDriverWait(self.driver, 3, 0.1).until(
                 EC.presence_of_element_located((By.XPATH, "//*[@id='card']"))
             )
-            visa_card_number.send_keys("4242424242424242")
+            visa_card_number.send_keys(f"{self.visa_credit_card_number}")
             visa_expiry_date = WebDriverWait(self.driver, 3, 0.1).until(
                 EC.presence_of_element_located((By.XPATH, "//*[@id='expiry']"))
             )
-            visa_expiry_date.send_keys("11")
+            visa_expiry_date.send_keys(f"{self.visa_mm}")
             time.sleep(0.1)
-            visa_expiry_date.send_keys("29")
+            visa_expiry_date.send_keys(f"{self.visa_yy}")
             visa_cvc = WebDriverWait(self.driver, 3, 0.1).until(
                 EC.presence_of_element_located((By.XPATH, "//*[@id='code']"))
             )
-            visa_cvc.send_keys("333")
-            logger.info("点击去付款按钮")
-            purchase_button = WebDriverWait(self.driver, 3, 0.1).until(
-                EC.element_to_be_clickable((By.XPATH, "//*[@id='proceedDisplay']/form/div[2]/div[30]/button"))
-            )
-            purchase_button.click()
+            visa_cvc.send_keys(f"{self.visa_security_code}")
+            self._purchase_button_click()
         except Exception as e:
             logger.info(f"付款信息填入失败 error:{e}")
             time.sleep(1000)
+        return
+
+    def _checkbox_select(self):
         logger.info("复选框选择")
         time.sleep(2)
         try:
@@ -484,14 +538,19 @@ class CityLineTicket:
                 By.XPATH, "/html/body/section[1]/div[2]/div[1]/div[4]/div[2]/label"
             )
             third_multiple_check_box.click()
-            logger.info("确认付款按钮点击")
         except Exception as e:
             logger.info(f"复选框选择失败 error:{e}")
             time.sleep(1000)
+        logger.info("确认付款按钮点击")
         confirm_button = WebDriverWait(self.driver, 3, 0.1).until(
             EC.element_to_be_clickable((By.XPATH, "//*[@id='mainContainer']/div[1]/div[7]/button[2]"))
         )
         confirm_button.click()
+        if self.payment_method == "alipay":
+            time.sleep(5)
+            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            self.driver.save_screenshot(f"screenshot/{self.browser_id}_alipay_{timestamp}.png")
+            time.sleep(300)
         return
 
 

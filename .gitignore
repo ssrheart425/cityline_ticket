@@ -3,3 +3,9 @@
 __pycache__/
 .DS_Store
 .env
+# 忽略根目录的 screenshot 目录下所有内容
+/screenshot/*
+
+# 但保留其中的 .gitkeep 文件（顺序在忽略规则之后）
+!/screenshot/.gitkeep
+!/screenshot/

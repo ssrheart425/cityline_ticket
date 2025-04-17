@@ -1,3 +1,6 @@
 import os
+from dotenv import load_dotenv
 
-twocaptcha_key = os.getenv("TWOCAPTCHA_KEY")
+load_dotenv()
+
+TWOCAPTCHA_KEY = os.getenv("TWOCAPTCHA_KEY")
