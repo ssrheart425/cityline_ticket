@@ -1,17 +1,17 @@
 import json
 import os
 import random
-import threading
 import time
 from concurrent.futures import ProcessPoolExecutor
 
-import requests
+import psutil  # 用于强制终止残留进程
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
 from twocaptcha import TwoCaptcha
+from undetected_chromedriver import Chrome, ChromeOptions
 
 from config import env_config as conf
 from my_logging import logger
@@ -552,73 +552,98 @@ class CityLineTicket:
         return
 
 
-def process_ticket(browser_id):
-    """
-    处理单个浏览器的购票流程（含并发优化）
-    :param browser_id: 浏览器实例的唯一标识符
-    """
-    try:
-        # 添加随机延迟（2~4秒）缓解并发竞争
-        initial_delay = random.uniform(2, 4)
-        logger.info(f"浏览器 {browser_id} 初始化前等待 {initial_delay:.2f} 秒")
-        time.sleep(initial_delay)
+def process_ticket(browser_id, max_retries=3):
+    """处理购票流程（含自动重试）"""
+    retry_count = 0
+    while retry_count < max_retries:
+        driver = None
+        try:
+            # 随机延迟缓解并发竞争
+            initial_delay = random.uniform(3, 5)
+            logger.info(f"浏览器 {browser_id} 初始化前等待 {initial_delay:.2f} 秒 (重试次数: {retry_count})")
+            time.sleep(initial_delay)
 
-        cityline_ticket = CityLineTicket(browser_id=browser_id)  # 确保类支持该参数
-        cityline_ticket.main_process()
-    except Exception as e:
-        logger.error(f"处理浏览器 {browser_id} 时出错: {str(e)}")
-        raise
+            # 初始化浏览器实例（含重试）
+            cityline_ticket = CityLineTicket(browser_id=browser_id)
+            cityline_ticket.main_process()
+            return  # 成功则退出循环
+        except Exception as e:
+            logger.error(f"浏览器 {browser_id} 第 {retry_count+1} 次重试失败: {str(e)}")
+            # 强制清理残留资源
+            if driver is not None:
+                try:
+                    driver.quit()
+                except:
+                    pass
+            _kill_chrome_processes()  # 确保彻底退出
+            retry_count += 1
+            if retry_count < max_retries:
+                # 指数退避策略
+                backoff_time = 2**retry_count + random.uniform(0, 1)
+                logger.info(f"等待 {backoff_time:.2f} 秒后重试...")
+                time.sleep(backoff_time)
+    logger.error(f"浏览器 {browser_id} 超过最大重试次数 {max_retries}，终止任务")
+
+
+def _kill_chrome_processes():
+    """强制终止所有残留的 Chrome 进程"""
+    for proc in psutil.process_iter(["name"]):
+        if proc.info["name"] in ("chrome", "chromedriver"):
+            try:
+                proc.kill()
+            except:
+                pass
 
 
 def main():
     try:
-        logger.info("开始加载配置文件")
+        logger.info("加载配置文件")
         with open("config/config.json", "r") as f:
             configs = json.load(f)
-            logger.info(f"成功加载配置文件，内容: {configs}")
-
         browser_ids = [item["browser_id"] for item in configs]
 
-        # 主进程预先初始化驱动（可选）
+        # 主进程预初始化驱动（确保可用性）
         _preinit_chromedriver()
 
-        with ProcessPoolExecutor(max_workers=3) as executor:
-            logger.info(f"准备启动的浏览器ID列表: {browser_ids}")
-
-            # 提交任务时添加间隔（建议1~3秒）
+        # 优化进程启动间隔（防止瞬时并发）
+        with ProcessPoolExecutor(max_workers=15) as executor:
             futures = []
             for idx, bid in enumerate(browser_ids):
-                futures.append(executor.submit(process_ticket, bid))
-                if idx != len(browser_ids) - 1:  # 最后一个任务不等待
-                    time.sleep(1.5)  # 控制进程启动间隔
+                # 提交任务时增加动态间隔（1~3秒）
+                submit_delay = random.uniform(1, 3) if idx != 0 else 0
+                time.sleep(submit_delay)
+
+                # 提交任务
+                future = executor.submit(process_ticket, bid)
+                futures.append(future)
+                logger.info(f"已提交浏览器 {bid} 的任务")
 
             # 等待所有任务完成
             for future in futures:
-                try:
-                    future.result()
-                except Exception as e:
-                    logger.error(f"任务执行出错: {str(e)}")
+                future.result()
     except Exception as e:
-        logger.error(f"程序执行出错: {str(e)}")
+        logger.error(f"主程序异常: {str(e)}")
 
 
-def _preinit_chromedriver():
-    """主进程预先初始化驱动确保文件存在"""
-    from undetected_chromedriver import Chrome
-
-    logger.info("预初始化chromedriver...")
-    try:
-        temp_driver = Chrome()
-        temp_driver.quit()
-    except Exception as e:
-        logger.warning(f"预初始化失败: {e}")
+def _preinit_chromedriver(retries=2):
+    """预初始化驱动（含重试）"""
+    logger.info("预初始化 ChromeDriver...")
+    for attempt in range(retries + 1):
+        try:
+            options = ChromeOptions()
+            options.add_argument("--headless")  # 预初始化可使用无头模式
+            driver = Chrome(options=options)
+            driver.quit()
+            logger.info("ChromeDriver 预初始化成功")
+            return
+        except Exception as e:
+            if attempt < retries:
+                logger.warning(f"预初始化失败，第 {attempt+1} 次重试...")
+                time.sleep(2)
+            else:
+                logger.error(f"ChromeDriver 预初始化最终失败: {e}")
+                raise
 
 
 if __name__ == "__main__":
-    # cityline_ticket = CityLineTicket(browser_id="ticket1")
-    # cityline_ticket.main_process()
     main()
-
-# if __name__ == "__main__":
-#     cityline_ticket = CityLineTicket(browser_id="ticket1")
-#     cityline_ticket.main_process()
