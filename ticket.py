@@ -123,7 +123,7 @@ class CityLineTicket:
         self._search_keyword()
         # 等待页面加载完成
         time.sleep(0.5)
-        logger.info("点击前往购票按钮")
+        logger.info(f"{self.browser_id} 点击前往购票按钮")
         self._click_go_button()
         time.sleep(0.5)
         # 点击购票 登入 检查模态框
@@ -147,14 +147,14 @@ class CityLineTicket:
             self._save_cookies(browser_id)
         self.driver = uc.Chrome(headless=False, use_subprocess=False)
         self.driver.get("https://www.cityline.com")
-        logger.info("删除所有cookies")
+        logger.info(f"{self.browser_id} 删除所有cookies")
         self.driver.delete_all_cookies()
-        logger.info("加载Cookies")
+        logger.info(f"{self.browser_id} 加载Cookies")
         with open(f"user_cookies/cityline_cookies_{browser_id}.json", "r") as f:
             cookies = json.load(f)
             for cookie in cookies:
                 self.driver.add_cookie(cookie)
-        logger.info("刷新页面")
+        logger.info(f"{self.browser_id} 刷新页面")
         self.driver.refresh()
         return self.driver
 
@@ -164,19 +164,19 @@ class CityLineTicket:
         return
 
     def _search_keyword(self):
-        logger.info("搜索关键字")
+        logger.info(f"{self.browser_id} 搜索关键字")
         first_input_element = self.driver.find_element(
             By.XPATH, "//*[@id='app']/div/div[2]/div[4]/div[2]/div/div/span/input"
         )
         first_input_element.send_keys(self.keys)
         first_input_element.send_keys(Keys.RETURN)
         time.sleep(0.5)
-        logger.info("点击搜索结果")
+        logger.info(f"{self.browser_id} 点击搜索结果")
         search_first_div = self.driver.find_element(By.XPATH, "/html/body/div[1]/div/div[2]/div[4]/div[5]")
         link = search_first_div.find_element(By.TAG_NAME, "a")
         link.click()
-        logger.info("获取所有标签页的句柄")
-        logger.info("切换到最新打开的标签页")
+        logger.info(f"{self.browser_id} 获取所有标签页的句柄")
+        logger.info(f"{self.browser_id} 切换到最新打开的标签页")
         self._switch_to_new_window()
         return
 
@@ -187,13 +187,13 @@ class CityLineTicket:
                 parent_div = self.driver.find_element(By.CLASS_NAME, "buyTicketBox")
                 go_button = parent_div.find_element(By.XPATH, ".//*[@id='buyTicketBtn']")
                 go_button.click()
-                logger.info("成功点击前往购票按钮")
+                logger.info(f"{self.browser_id} 成功点击前往购票按钮")
                 break
 
             except Exception as e:
                 logger.info(f"{self.browser_id} 未找到前往购票按钮 刷新重试")
                 self.driver.refresh()
-                time.sleep(0.1)
+                time.sleep(0.5)
 
     def _retry_button(self, current_title):
         # 当标题包含"Cityline"时继续循环
@@ -219,18 +219,18 @@ class CityLineTicket:
                             logger.info(f"{self.browser_id} 成功找到按钮: {xpath}")
                             break
                     except Exception as e:
-                        logger.info(f"{self.browser_id} 按钮未找到: {xpath}, 错误: {str(e)}")
+                        logger.info(f"{self.browser_id} 按钮未找到: {xpath}")
 
                 if queue_button:
                     queue_button.click()
                 else:
-                    raise Exception("所有可能的按钮路径都未找到可点击的按钮")
+                    raise Exception(f"{self.browser_id} 所有可能的按钮路径都未找到可点击的按钮")
                 # 更新当前页面标题
                 current_title = self.driver.title
                 logger.info(f"{self.browser_id} 更新后的页面标题: {current_title}")
             except Exception as e:
                 logger.info(f"{self.browser_id} 模态框不存在或页面已变化: {str(e)}")
-                logger.info("刷新页面并重试...")
+                logger.info(f"{self.browser_id} 刷新页面并重试...")
                 self.driver.refresh()
                 time.sleep(2)  # 等待页面刷新完成
                 # 更新当前页面标题
@@ -240,17 +240,16 @@ class CityLineTicket:
         return
 
     def _check_model(self):
-        logger.info("切换到最新打开的标签页")
+        logger.info(f"{self.browser_id} 切换到最新打开的标签页")
         self._switch_to_new_window()
         time.sleep(2)
-        self.driver.save_screenshot(f"screenshot_{self.browser_id}.png")
 
         # 获取当前页面标题
         current_title = self.driver.title
-        logger.info(f"当前页面标题: {current_title}")
+        logger.info(f"{self.browser_id} 当前页面标题: {current_title}")
         time.sleep(0.5)
         self._retry_button(current_title)
-        logger.info("点击购买按钮")
+        logger.info(f"{self.browser_id} 点击购买按钮")
         try:
             buy_button = WebDriverWait(self.driver, 3, 0.5).until(
                 EC.visibility_of_element_located(
@@ -259,7 +258,7 @@ class CityLineTicket:
             )
             buy_button.click()
         except Exception as e:
-            logger.error(f"{self.browser_id} 购买按钮超时未加载出来")
+            logger.error(f"{self.browser_id} 购买按钮超时未加载出来 error:{e}")
         time.sleep(10)
         try:
             input_ele = WebDriverWait(self.driver, 10, 0.1).until(
@@ -270,12 +269,12 @@ class CityLineTicket:
             input_value = input_ele.get_attribute("value")
             if not input_value:
                 self.driver_url = self.driver.current_url
-                logger.info("2captcha开始解决turnstile")
+                logger.info(f"{self.browser_id} 2captcha开始解决turnstile")
                 solver = TwoCaptcha(self.twocaptcha_apikey)
                 result = solver.turnstile(sitekey="0x4AAAAAAAWNjB2Bt2Whyc7f", url=self.driver_url)
-                logger.info(f"2captcha解决成功!")
+                logger.info(f"{self.browser_id} 2captcha解决成功!")
                 self.solved_code = result["code"]
-                logger.info(f"返回code {self.solved_code}")
+                logger.info(f"{self.browser_id} 返回code {self.solved_code}")
                 self.driver.execute_script(
                     """
                     document.evaluate("//input[@name='cf-turnstile-response']", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)
@@ -283,37 +282,37 @@ class CityLineTicket:
                 """,
                     self.solved_code,
                 )
-                logger.info(f"执行script 往input插入code")
+                logger.info(f"{self.browser_id} 执行script 往input插入code")
                 login_button = WebDriverWait(self.driver, 30, 0.1).until(
                     EC.visibility_of_element_located(
                         (By.XPATH, "/html/body/div[1]/section[1]/div/div/div/div[3]/button")
                     )
                 )
-                logger.info(f"执行script 设置login_button 可见")
+                logger.info(f"{self.browser_id} 执行script 设置login_button 可见")
                 self.driver.execute_script("arguments[0].removeAttribute('disabled')", login_button)
-                logger.info(f"执行script 设置不透明度为1")
+                logger.info(f"{self.browser_id} 执行script 设置不透明度为1")
                 self.driver.execute_script("arguments[0].style.opacity = '1'", login_button)
                 time.sleep(3)
-                logger.info("2captcha完成之后点击登入按钮")
+                logger.info(f"{self.browser_id} 2captcha完成之后点击登入按钮")
                 login_button.click()
         except Exception as e:
-            logger.info(f"无captcha触发或解决失败: {e}")
+            logger.info(f"{self.browser_id} 无captcha触发或解决失败: {e}")
         while True:
             try:
                 time.sleep(3)
                 login_button.click()
             except Exception as e:
-                logger.info(f"点击login_button失败")
+                logger.info(f"{self.browser_id} 点击login_button失败")
                 break
         time.sleep(3)
         try:
-            logger.info("点击登入按钮")
+            logger.info(f"{self.browser_id} 点击登入按钮")
             login_button = WebDriverWait(self.driver, 10, 0.1).until(
                 EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/section[1]/div/div/div/div[3]/button"))
             )
             login_button.click()
         except Exception as e:
-            logger.info(f"没找到登入按钮 继续执行")
+            logger.info(f"{self.browser_id} 没找到登入按钮 继续执行")
         time.sleep(3)
         logger.info(f"{self.browser_id} 检测模态框是否存在")
         try:
@@ -333,8 +332,7 @@ class CityLineTicket:
         time.sleep(1)
         try:
             logger.info(f"{self.browser_id} 尝试选择票种: {self.ticket_type}")
-            time.sleep(2)
-
+            time.sleep(3)
             dropdown_element = self.driver.find_element(By.NAME, f"ticketType0")
             select = Select(dropdown_element)
             select.select_by_index(self.ticket_type)
@@ -458,22 +456,22 @@ class CityLineTicket:
             )
             ticket_collection_input2.send_keys(f"{self.ticket_password}")
         except Exception as e:
-            logger.info("取票密码输入框不存在，跳过输入")
+            logger.info(f"{self.browser_id} 取票密码输入框不存在，跳过输入 error:{e}")
         return
 
     def _purchase_button_click(self):
         try:
-            logger.info("点击去付款(确认)按钮")
+            logger.info(f"{self.browser_id} 点击去付款(确认)按钮")
             purchase_button = WebDriverWait(self.driver, 3, 0.1).until(
                 EC.element_to_be_clickable((By.XPATH, "//*[@id='proceedDisplay']/form/div[2]/div[30]/button"))
             )
             purchase_button.click()
         except Exception as e:
-            logger.error(f"确认按钮点击失败 error:{e}")
+            logger.error(f"{self.browser_id} 确认按钮点击失败 error:{e}")
         return
 
     def _alipay_payment(self):
-        logger.info("点击支付宝付款方式")
+        logger.info(f"{self.browser_id} 点击支付宝付款方式")
         try:
             alipay_button = WebDriverWait(self.driver, 8, 0.1).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "[data-payment-code='ALIPAY']"))
@@ -481,11 +479,11 @@ class CityLineTicket:
             alipay_button.click()
             self._purchase_button_click()
         except Exception as e:
-            logger.error(f"点击支付宝付款失败 error: {e}")
+            logger.error(f"{self.browser_id} 点击支付宝付款失败 error: {e}")
         return
 
     def _visa_payment(self):
-        logger.info("点击visa付款方式")
+        logger.info(f"{self.browser_id} 点击visa付款方式")
         self.visa_name = self.config.get("visa_name")
         self.visa_credit_card_number = self.config.get("visa_credit_card_number")
         self.visa_mm = self.config.get("visa_mm")
@@ -496,7 +494,7 @@ class CityLineTicket:
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "[data-payment-code='VISA']"))
             )
             visa_button.click()
-            logger.info("付款信息填入")
+            logger.info(f"{self.browser_id} 付款信息填入")
             # /html/body/section[1]/div[3]/div[1]/form/div[2]/div[25]/input
             visa_name = WebDriverWait(self.driver, 8, 0.1).until(
                 EC.presence_of_element_located((By.XPATH, "//*[@id='holder']"))
@@ -518,12 +516,12 @@ class CityLineTicket:
             visa_cvc.send_keys(f"{self.visa_security_code}")
             self._purchase_button_click()
         except Exception as e:
-            logger.info(f"付款信息填入失败 error:{e}")
+            logger.info(f"{self.browser_id} 付款信息填入失败 error:{e}")
             time.sleep(1000)
         return
 
     def _checkbox_select(self):
-        logger.info("复选框选择")
+        logger.info(f"{self.browser_id} 复选框选择")
         time.sleep(2)
         try:
             first_multiple_check_box = self.driver.find_element(
@@ -539,9 +537,9 @@ class CityLineTicket:
             )
             third_multiple_check_box.click()
         except Exception as e:
-            logger.info(f"复选框选择失败 error:{e}")
+            logger.info(f"{self.browser_id} 复选框选择失败 error:{e}")
             time.sleep(1000)
-        logger.info("确认付款按钮点击")
+        logger.info(f"{self.browser_id} 确认付款按钮点击")
         confirm_button = WebDriverWait(self.driver, 3, 0.1).until(
             EC.element_to_be_clickable((By.XPATH, "//*[@id='mainContainer']/div[1]/div[7]/button[2]"))
         )
