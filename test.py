@@ -22,7 +22,7 @@ def get_cityline_cookies(browser_id):
         logger.info("等待手动登录...")
         login_button = WebDriverWait(driver, 3, 0.1).until(EC.element_to_be_clickable((By.CLASS_NAME, "btn-login")))
         login_button.click()
-        time.sleep(60)  # 等待手动登录
+        time.sleep(100)  # 等待手动登录
 
         # 确保目录存在
         os.makedirs("user_cookies", exist_ok=True)

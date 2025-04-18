@@ -139,14 +139,5 @@
         "date": [0],
         "ticket_password": "456789",
         "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket15",
-        "keys": "五月天",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
     }
 ]
