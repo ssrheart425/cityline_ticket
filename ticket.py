@@ -139,6 +139,7 @@ class CityLineTicket:
             self._alipay_payment()
         time.sleep(0.5)
         self._checkbox_select()
+        self._screenshot_code(self.payment_method)
         time.sleep(30000)
         self.driver.quit()
 
@@ -520,6 +521,27 @@ class CityLineTicket:
             time.sleep(1000)
         return
 
+    def _screenshot_code(self, payment_method):
+        if payment_method == "alipay":
+            time.sleep(5)
+            try:
+                WebDriverWait(self.driver, 20, 0.1).until(
+                    EC.frame_to_be_available_and_switch_to_it(
+                        (By.XPATH, "/html/body/section[2]/div/div/div/div[2]/iframe")
+                    )
+                )
+                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(2)
+                self.driver.switch_to.default_content()
+            except Exception as e:
+                logger.info(f"切换到iframe中失败或滚动失败")
+            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            self.driver.save_screenshot(f"screenshot/{self.browser_id}_alipay_{timestamp}.png")
+            time.sleep(300)
+        else:
+            return
+        return
+
     def _checkbox_select(self):
         logger.info(f"{self.browser_id} 复选框选择")
         time.sleep(2)
@@ -544,11 +566,6 @@ class CityLineTicket:
             EC.element_to_be_clickable((By.XPATH, "//*[@id='mainContainer']/div[1]/div[7]/button[2]"))
         )
         confirm_button.click()
-        if self.payment_method == "alipay":
-            time.sleep(5)
-            timestamp = time.strftime("%Y%m%d-%H%M%S")
-            self.driver.save_screenshot(f"screenshot/{self.browser_id}_alipay_{timestamp}.png")
-            time.sleep(300)
         return
 
 
@@ -646,4 +663,4 @@ def _preinit_chromedriver(retries=2):
 
 
 if __name__ == "__main__":
-    main(max_workers=12)
+    main(max_workers=1)
