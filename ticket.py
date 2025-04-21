@@ -132,7 +132,7 @@ class CityLineTicket:
         self._select_ticket()
         time.sleep(0.5)
         self._insert_ticket_password()
-        time.sleep(0.5)
+        time.sleep(2)
         if self.payment_method == "visa":
             self._visa_payment()
         elif self.payment_method == "alipay":
@@ -385,12 +385,12 @@ class CityLineTicket:
                         logger.info(f"{self.browser_id} 成功选择票价{ticket_price}")
                         return
                 except Exception as e:
-                    logger.info(f"{self.browser_id} 选择票价{ticket_price}失败: {str(e)}")
+                    logger.info(f"{self.browser_id} 选择票价{ticket_price}失败")
                     continue
             logger.error(f"{self.browser_id} 所有票价都尝试失败")
             raise Exception("没有可用的票价")
         except Exception as e:
-            logger.error(f"{self.browser_id} 选择票种失败: {str(e)}")
+            logger.error(f"{self.browser_id} 选择票种失败")
             raise
 
     def _select_date(self):
@@ -441,7 +441,7 @@ class CityLineTicket:
             time.sleep(1)
 
         except Exception as e:
-            logger.error(f"{self.browser_id} 选择日期失败: {str(e)}")
+            logger.error(f"{self.browser_id} 选择日期失败")
             raise
 
     def _insert_ticket_password(self):
@@ -595,7 +595,7 @@ def _kill_chrome_processes():
                 pass
 
 
-def main():
+def main(max_workers):
     try:
         logger.info("加载配置文件")
         with open("config/config.json", "r") as f:
@@ -606,7 +606,7 @@ def main():
         _preinit_chromedriver()
 
         # 优化进程启动间隔（防止瞬时并发）
-        with ProcessPoolExecutor(max_workers=15) as executor:
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
             futures = []
             for idx, bid in enumerate(browser_ids):
                 # 提交任务时增加动态间隔（1~3秒）
@@ -646,4 +646,4 @@ def _preinit_chromedriver(retries=2):
 
 
 if __name__ == "__main__":
-    main()
+    main(max_workers=12)
