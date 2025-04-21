@@ -251,6 +251,7 @@ class CityLineTicket:
         time.sleep(0.5)
         self._retry_button(current_title)
         logger.info(f"{self.browser_id} 点击购买按钮")
+        self.driver.execute_script("window.scrollTo(0, 100);")
         try:
             buy_button = WebDriverWait(self.driver, 3, 0.5).until(
                 EC.visibility_of_element_located(
@@ -618,6 +619,7 @@ def main(max_workers):
         with open("config/config.json", "r") as f:
             configs = json.load(f)
         browser_ids = [item["browser_id"] for item in configs]
+        # browser_ids = ["ticket1"]
 
         # 主进程预初始化驱动（确保可用性）
         _preinit_chromedriver()
@@ -663,4 +665,4 @@ def _preinit_chromedriver(retries=2):
 
 
 if __name__ == "__main__":
-    main(max_workers=1)
+    main(max_workers=20)
