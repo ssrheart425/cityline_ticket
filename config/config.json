@@ -1,7 +1,7 @@
 [   
     {
         "browser_id": "ticket1",
-        "keys": "五月天",
+        "keys": "G-Dragon",
         "ticket_price": [0,1,8,9],
         "ticket_type": 2,
         "date": [0],
@@ -10,7 +10,7 @@
     },
     {
         "browser_id": "ticket2",
-        "keys": "五月天",
+        "keys": "G-Dragon",
         "ticket_price": [0,1,8,9],
         "ticket_type": 2,
         "date": [0],
@@ -19,7 +19,7 @@
     },
     {
         "browser_id": "ticket3",
-        "keys": "五月天",
+        "keys": "G-Dragon",
         "ticket_price": [0,1,8,9],
         "ticket_type": 2,
         "date": [0],
@@ -28,7 +28,7 @@
     },
     {
         "browser_id": "ticket4",
-        "keys": "五月天",
+        "keys": "G-Dragon",
         "ticket_price": [0,1,8,9],
         "ticket_type": 2,
         "date": [0],
@@ -37,7 +37,7 @@
     },
     {
         "browser_id": "ticket5",
-        "keys": "五月天",
+        "keys": "G-Dragon",
         "ticket_price": [0,1,8,9],
         "ticket_type": 2,
         "date": [0],
@@ -46,7 +46,7 @@
     },
     {
         "browser_id": "ticket6",
-        "keys": "五月天",
+        "keys": "G-Dragon",
         "ticket_price": [0,1,8,9],
         "ticket_type": 2,
         "date": [0],
@@ -55,151 +55,7 @@
     },
     {
         "browser_id": "ticket7",
-        "keys": "五月天",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket8",
-        "keys": "五月天",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket9",
-        "keys": "五月天",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket10",
-        "keys": "五月天",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket11",
-        "keys": "五月天",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket12",
-        "keys": "五月天",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket13",
-        "keys": "五月天",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket14",
-        "keys": "五月天",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket15",
-        "keys": "五月天",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket16",
-        "keys": "五月天",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket17",
-        "keys": "五月天",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket18",
-        "keys": "五月天",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket19",
-        "keys": "五月天",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket20",
-        "keys": "五月天",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket21",
-        "keys": "五月天",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket22",
-        "keys": "五月天",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket23",
-        "keys": "五月天",
+        "keys": "G-Dragon",
         "ticket_price": [0,1,8,9],
         "ticket_type": 2,
         "date": [0],

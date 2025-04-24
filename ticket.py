@@ -6,13 +6,14 @@ from concurrent.futures import ProcessPoolExecutor
 
 import psutil  # 用于强制终止残留进程
 import undetected_chromedriver as uc
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
 from twocaptcha import TwoCaptcha
 from undetected_chromedriver import Chrome, ChromeOptions
-
+from selenium.webdriver.chrome.service import Service
 from config import env_config as conf
 from my_logging import logger
 
@@ -38,6 +39,7 @@ class CityLineTicket:
         self.visa_security_code = None
         self.twocaptcha_apikey = conf.TWOCAPTCHA_KEY
         self.css_locator_for_input_send_token = 'input[name="cf-turnstile-response"]'
+        self.chrome_driver_path = "/usr/local/bin/chromedriver"
         logger.info(
             f"初始化CityLineTicket实例 - browser_id: {self.browser_id}, keys: {self.keys}, ticket_price: {self.ticket_price}, ticket_type: {self.ticket_type}"
         )
@@ -51,7 +53,7 @@ class CityLineTicket:
             logger.info(f"开始加载配置文件,查找browser_id: {self.browser_id}")
             with open("config/config.json", "r") as f:
                 configs = json.load(f)
-                logger.info(f"配置文件内容: {configs}")
+                # logger.info(f"配置文件内容: {configs}")
                 for config in configs:
                     if config["browser_id"] == self.browser_id:
                         logger.info(f"找到匹配的配置: {config}")
@@ -78,7 +80,8 @@ class CityLineTicket:
         保存Cookies
         :param browser_id: 浏览器实例的唯一标识符
         """
-        self.driver = uc.Chrome(headless=False, use_subprocess=False)
+        service = Service(executable_path=self.chrome_driver_path)  # 指定路径
+        self.driver = uc.Chrome(service=service, headless=False, use_subprocess=False)
         logger.info(f"打开浏览器 访问网站")
         self.driver.get("https://www.cityline.com")
         logger.info(f"{browser_id} 清空初始Cookies")
@@ -116,7 +119,7 @@ class CityLineTicket:
         :return: cookies 列表
         """
         # 加载cookies 刷新页面
-        self.driver = self._load_cookies_refresh(self.browser_id)
+        # self.driver = self._load_cookies_refresh(self.browser_id)
         # 等待页面加载完成
         time.sleep(0.5)
         # 搜索关键词
@@ -146,7 +149,8 @@ class CityLineTicket:
     def _load_cookies_refresh(self, browser_id):
         if not self._check_user_cookies(browser_id):
             self._save_cookies(browser_id)
-        self.driver = uc.Chrome(headless=False, use_subprocess=False)
+        service = Service(executable_path=self.chrome_driver_path)  # 指定路径
+        self.driver = uc.Chrome(service=service, headless=False, use_subprocess=False)
         self.driver.get("https://www.cityline.com")
         logger.info(f"{self.browser_id} 删除所有cookies")
         self.driver.delete_all_cookies()
@@ -194,7 +198,7 @@ class CityLineTicket:
             except Exception as e:
                 logger.info(f"{self.browser_id} 未找到前往购票按钮 刷新重试")
                 self.driver.refresh()
-                time.sleep(0.5)
+                time.sleep(1)
 
     def _retry_button(self, current_title):
         # 当标题包含"Cityline"时继续循环
@@ -532,7 +536,7 @@ class CityLineTicket:
                     )
                 )
                 self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(2)
+                time.sleep(5)
                 self.driver.switch_to.default_content()
             except Exception as e:
                 logger.info(f"切换到iframe中失败或滚动失败")
@@ -575,6 +579,7 @@ def process_ticket(browser_id, max_retries=3):
     retry_count = 0
     while retry_count < max_retries:
         driver = None
+        driver_pid = None  # 新增变量记录Chromedriver的PID
         try:
             # 随机延迟缓解并发竞争
             initial_delay = random.uniform(3, 5)
@@ -583,8 +588,11 @@ def process_ticket(browser_id, max_retries=3):
 
             # 初始化浏览器实例（含重试）
             cityline_ticket = CityLineTicket(browser_id=browser_id)
+            # 加载cookies并初始化driver
+            driver = cityline_ticket._load_cookies_refresh(browser_id)
+            driver_pid = driver.service.process.pid  # 记录Chromedriver进程PID
             cityline_ticket.main_process()
-            return  # 成功则退出循环
+            return
         except Exception as e:
             logger.error(f"浏览器 {browser_id} 第 {retry_count+1} 次重试失败: {str(e)}")
             # 强制清理残留资源
@@ -593,7 +601,8 @@ def process_ticket(browser_id, max_retries=3):
                     driver.quit()
                 except:
                     pass
-            _kill_chrome_processes()  # 确保彻底退出
+            if driver_pid is not None:
+                _kill_chrome_processes(driver_pid)  # 仅终止相关进程
             retry_count += 1
             if retry_count < max_retries:
                 # 指数退避策略
@@ -603,14 +612,34 @@ def process_ticket(browser_id, max_retries=3):
     logger.error(f"浏览器 {browser_id} 超过最大重试次数 {max_retries}，终止任务")
 
 
-def _kill_chrome_processes():
-    """强制终止所有残留的 Chrome 进程"""
-    for proc in psutil.process_iter(["name"]):
-        if proc.info["name"] in ("chrome", "chromedriver"):
-            try:
-                proc.kill()
-            except:
-                pass
+def _kill_chrome_processes(parent_pid):
+    """强制终止指定PID及其所有子进程"""
+    try:
+        parent = psutil.Process(parent_pid)
+    except psutil.NoSuchProcess:
+        return  # 进程已退出则忽略
+
+    # 获取所有子进程（包括递归子进程）
+    try:
+        children = parent.children(recursive=True)
+    except psutil.NoSuchProcess:
+        children = []
+
+    # 构建进程列表并终止
+    processes = [parent] + children
+    for proc in processes:
+        try:
+            proc.kill()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+
+    # 等待进程终止
+    gone, alive = psutil.wait_procs(processes, timeout=5)
+    for proc in alive:
+        try:
+            proc.terminate()  # 再次尝试终止
+        except:
+            pass
 
 
 def main(max_workers):
@@ -619,7 +648,6 @@ def main(max_workers):
         with open("config/config.json", "r") as f:
             configs = json.load(f)
         browser_ids = [item["browser_id"] for item in configs]
-        # browser_ids = ["ticket1"]
 
         # 主进程预初始化驱动（确保可用性）
         _preinit_chromedriver()
@@ -647,11 +675,16 @@ def main(max_workers):
 def _preinit_chromedriver(retries=2):
     """预初始化驱动（含重试）"""
     logger.info("预初始化 ChromeDriver...")
+    chrome_driver_path = "/usr/local/bin/chromedriver"
     for attempt in range(retries + 1):
         try:
             options = ChromeOptions()
             options.add_argument("--headless")  # 预初始化可使用无头模式
-            driver = Chrome(options=options)
+            service = Service(executable_path=chrome_driver_path)  # 指定路径
+            if not os.path.exists(chrome_driver_path):
+                logger.error(f"ChromeDriver未找到于: {chrome_driver_path}")
+                raise FileNotFoundError
+            driver = Chrome(service=service, options=options)
             driver.quit()
             logger.info("ChromeDriver 预初始化成功")
             return
@@ -665,4 +698,8 @@ def _preinit_chromedriver(retries=2):
 
 
 if __name__ == "__main__":
-    main(max_workers=20)
+    main(max_workers=7)
+
+
+# export http_proxy="http://127.0.0.1:7890"
+# export https_proxy="http://127.0.0.1:7890"
