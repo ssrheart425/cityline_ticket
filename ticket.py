@@ -128,21 +128,22 @@ class CityLineTicket:
         time.sleep(0.5)
         logger.info(f"{self.browser_id} 点击前往购票按钮")
         self._click_go_button()
-        time.sleep(0.5)
+        time.sleep(5)
         # 点击购票 登入 检查模态框
         self._check_model()
-        time.sleep(0.5)
-        self._select_ticket()
-        time.sleep(0.5)
-        self._insert_ticket_password()
-        time.sleep(2)
-        if self.payment_method == "visa":
-            self._visa_payment()
-        elif self.payment_method == "alipay":
-            self._alipay_payment()
-        time.sleep(0.5)
-        self._checkbox_select()
-        self._screenshot_code(self.payment_method)
+        logger.info(f"{self.browser_id} 模态框检查完毕 人工接入操作")
+        # time.sleep(0.5)
+        # self._select_ticket()
+        # time.sleep(0.5)
+        # self._insert_ticket_password()
+        # time.sleep(2)
+        # if self.payment_method == "visa":
+        #     self._visa_payment()
+        # elif self.payment_method == "alipay":
+        #     self._alipay_payment()
+        # time.sleep(0.5)
+        # self._checkbox_select()
+        # self._screenshot_code(self.payment_method)
         time.sleep(30000)
         self.driver.quit()
 
@@ -191,11 +192,20 @@ class CityLineTicket:
             try:
                 # 直接查找父级div中的按钮
                 parent_div = self.driver.find_element(By.CLASS_NAME, "buyTicketBox")
-                go_button = parent_div.find_element(By.XPATH, ".//*[@id='buyTicketBtn']")
-                go_button.click()
-                logger.info(f"{self.browser_id} 成功点击前往购票按钮")
-                break
-
+                button_ids = ["buyTicketBtn", "buyTicketBtn1"]
+                for button_id in button_ids:
+                    try:
+                        go_button = parent_div.find_element(By.XPATH, f".//*[@id='{button_id}']")
+                        if go_button:
+                            go_button.click()
+                            logger.info(f"{self.browser_id} 成功点击前往购票按钮 {button_id}")
+                            return
+                    except Exception as e:
+                        logger.info(f"{self.browser_id} 未找到按钮 {button_id}，尝试下一个按钮")
+                        continue
+                logger.info(f"{self.browser_id} 所有按钮都未找到，刷新重试")
+                self.driver.refresh()
+                time.sleep(1)
             except Exception as e:
                 logger.info(f"{self.browser_id} 未找到前往购票按钮 刷新重试")
                 self.driver.refresh()
@@ -213,6 +223,7 @@ class CityLineTicket:
                 button_xpaths = [
                     "/html/body/div[3]/div[1]/div/div[1]/button[1]",
                     "/html/body/div[2]/div[1]/div/div[1]/button[1]",
+                    "/html/body/div[3]/div[1]/div/div[1]/button[2]",
                 ]
                 queue_button = None
                 for xpath in button_xpaths:
@@ -248,12 +259,10 @@ class CityLineTicket:
     def _check_model(self):
         logger.info(f"{self.browser_id} 切换到最新打开的标签页")
         self._switch_to_new_window()
-        time.sleep(200000)
-
         # 获取当前页面标题
         current_title = self.driver.title
         logger.info(f"{self.browser_id} 当前页面标题: {current_title}")
-        time.sleep(0.5)
+        time.sleep(1)
         self._retry_button(current_title)
         logger.info(f"{self.browser_id} 点击购买按钮")
         self.driver.execute_script("window.scrollTo(0, 100);")
@@ -420,7 +429,9 @@ class CityLineTicket:
             )
             success = False
             error_messages = []
-
+            #
+            # /html/body/section[1]/div[2]/div/div[2]/div[1]/div[3]/button[1]
+            # /html/body/section[1]/div[2]/div/div[2]/div[1]/div[3]/button[2]
             for date in self.date:
                 try:
                     if date >= len(performance_buttons):
@@ -589,7 +600,7 @@ def process_ticket(browser_id, max_retries=3):
     retry_count = 0
     while retry_count < max_retries:
         driver = None
-        driver_pid = None  # 新增变量记录Chromedriver的PID
+        # driver_pid = None  # 新增变量记录Chromedriver的PID
         try:
             # 随机延迟缓解并发竞争
             initial_delay = random.uniform(3, 5)
@@ -600,19 +611,19 @@ def process_ticket(browser_id, max_retries=3):
             cityline_ticket = CityLineTicket(browser_id=browser_id)
             # 加载cookies并初始化driver
             driver = cityline_ticket._load_cookies_refresh(browser_id)
-            driver_pid = driver.service.process.pid  # 记录Chromedriver进程PID
+            # driver_pid = driver.service.process.pid  # 记录Chromedriver进程PID
             cityline_ticket.main_process()
             return
         except Exception as e:
             logger.error(f"浏览器 {browser_id} 第 {retry_count+1} 次重试失败: {str(e)}")
             # 强制清理残留资源
-            if driver is not None:
-                try:
-                    driver.quit()
-                except:
-                    pass
-            if driver_pid is not None:
-                _kill_chrome_processes(driver_pid)  # 仅终止相关进程
+            # if driver is not None:
+            #     try:
+            #         driver.quit()
+            #     except:
+            #         pass
+            # if driver_pid is not None:
+            #     _kill_chrome_processes(driver_pid)  # 仅终止相关进程
             retry_count += 1
             if retry_count < max_retries:
                 # 指数退避策略
@@ -709,8 +720,26 @@ def _preinit_chromedriver(retries=2):
 
 
 if __name__ == "__main__":
-    main(max_workers=1)
+    main(max_workers=2)
 
 
 # export http_proxy="http://127.0.0.1:7890"
 # export https_proxy="http://127.0.0.1:7890"
+
+
+# 会员编号xpath
+# /html/body/main/div[2]/section/form/div/div/input
+# <input type="text" class="form-control form-control-error" id="memberNumber" aria-required="true">
+# //*[@id="memberNumber"]
+
+# 选票确定按钮
+# //*[@id="expressPurchaseBtn"]
+# /html/body/section[1]/div[2]/div/div[2]/div[2]/div[2]/button[3]
+
+# 错误信息
+# /html/body/section[1]/div[2]/div/div[1]/div/div[3]/div[2]/div[4]
+# //*[@id="error-msg-no-enough"]
+
+# //*[@id="error-msg-no-enough"]/i
+#   所选区段的尚馀座位正有其他顾客选取，暂时未能提供所须的座位
+# /html/body/section[1]/div[2]/div/div[1]/div/div[3]/div[2]/div[4]/i
