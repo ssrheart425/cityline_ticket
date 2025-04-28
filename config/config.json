@@ -1,63 +1,9 @@
 [   
     {
         "browser_id": "ticket1",
-        "keys": "G-Dragon",
+        "keys": "五月天",
         "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket2",
-        "keys": "G-Dragon",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket3",
-        "keys": "G-Dragon",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket4",
-        "keys": "G-Dragon",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket5",
-        "keys": "G-Dragon",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket6",
-        "keys": "G-Dragon",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
-        "date": [0],
-        "ticket_password": "456789",
-        "payment_method": "alipay"
-    },
-    {
-        "browser_id": "ticket7",
-        "keys": "G-Dragon",
-        "ticket_price": [0,1,8,9],
-        "ticket_type": 2,
+        "ticket_type": [5,4,3,2],
         "date": [0],
         "ticket_password": "456789",
         "payment_method": "alipay"

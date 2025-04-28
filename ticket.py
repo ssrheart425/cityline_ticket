@@ -14,12 +14,12 @@ from selenium.webdriver.support.ui import Select, WebDriverWait
 from twocaptcha import TwoCaptcha
 from undetected_chromedriver import Chrome, ChromeOptions
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.proxy import Proxy
 from config import env_config as conf
 from my_logging import logger
 
 
 class CityLineTicket:
-
     def __init__(self, browser_id):
         self.driver = None
         self.solved_code = None
@@ -149,8 +149,9 @@ class CityLineTicket:
     def _load_cookies_refresh(self, browser_id):
         if not self._check_user_cookies(browser_id):
             self._save_cookies(browser_id)
+        options = uc.ChromeOptions()
         service = Service(executable_path=self.chrome_driver_path)  # 指定路径
-        self.driver = uc.Chrome(service=service, headless=False, use_subprocess=False)
+        self.driver = uc.Chrome(service=service, headless=False, use_subprocess=False, options=options)
         self.driver.get("https://www.cityline.com")
         logger.info(f"{self.browser_id} 删除所有cookies")
         self.driver.delete_all_cookies()
@@ -201,7 +202,7 @@ class CityLineTicket:
                 time.sleep(1)
 
     def _retry_button(self, current_title):
-        # 当标题包含"Cityline"时继续循环
+        # 当标题等于 Cityline 时继续循环
         while current_title == "Cityline":
             try:
                 # 添加3-5秒的随机延迟
@@ -217,7 +218,7 @@ class CityLineTicket:
                 for xpath in button_xpaths:
                     try:
                         logger.info(f"{self.browser_id} 尝试定位按钮: {xpath}")
-                        queue_button = WebDriverWait(self.driver, 3, 0.3).until(
+                        queue_button = WebDriverWait(self.driver, 3, 1).until(
                             EC.element_to_be_clickable((By.XPATH, xpath))
                         )
                         if queue_button:
@@ -247,7 +248,7 @@ class CityLineTicket:
     def _check_model(self):
         logger.info(f"{self.browser_id} 切换到最新打开的标签页")
         self._switch_to_new_window()
-        time.sleep(2)
+        time.sleep(200000)
 
         # 获取当前页面标题
         current_title = self.driver.title
@@ -340,18 +341,27 @@ class CityLineTicket:
             logger.info(f"{self.browser_id} 尝试选择票种: {self.ticket_type}")
             time.sleep(3)
             dropdown_element = self.driver.find_element(By.NAME, f"ticketType0")
-            select = Select(dropdown_element)
-            select.select_by_index(self.ticket_type)
+            for ticket_type in self.ticket_type:
+                logger.info(f"{self.browser_id} 尝试选择票种: {ticket_type}")
+                try:
+                    select = Select(dropdown_element)
+                    select.select_by_index(ticket_type)
+                    logger.info(f"{self.browser_id} 选择票种完成")
+                    time.sleep(0.5)
+                    break
+                except Exception as e:
+                    logger.info(f"{self.browser_id} 选择票种{ticket_type}失败 继续尝试下一个")
+                    continue
             time.sleep(0.5)
             self._select_date()
             time.sleep(0.5)
             for ticket_price in self.ticket_price:
                 try:
                     if ticket_price > 8:
-                        logger.info(f"{self.browser_id} 票价编号{ticket_price}大于8，执行向下滚动")
+                        logger.info(f"{self.browser_id} 票价编号{ticket_price}大于8,执行向下滚动")
                         self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                     else:
-                        logger.info(f"{self.browser_id} 票价编号{ticket_price}小于等于8，执行向上滚动")
+                        logger.info(f"{self.browser_id} 票价编号{ticket_price}小于等于8,执行向上滚动")
                         self.driver.execute_script("window.scrollTo(0, 0);")
                     time.sleep(0.5)  # 等待滚动完成
                     # 选择票价
@@ -678,7 +688,8 @@ def _preinit_chromedriver(retries=2):
     chrome_driver_path = "/usr/local/bin/chromedriver"
     for attempt in range(retries + 1):
         try:
-            options = ChromeOptions()
+            options = uc.ChromeOptions()
+            # options.add_argument("--proxy-server=http://89946fa3e89f4537:RNW78Fm5@res.proxy-seller.com:10001")
             options.add_argument("--headless")  # 预初始化可使用无头模式
             service = Service(executable_path=chrome_driver_path)  # 指定路径
             if not os.path.exists(chrome_driver_path):
@@ -698,7 +709,7 @@ def _preinit_chromedriver(retries=2):
 
 
 if __name__ == "__main__":
-    main(max_workers=7)
+    main(max_workers=1)
 
 
 # export http_proxy="http://127.0.0.1:7890"
