@@ -51,7 +51,7 @@ class CityLineTicket:
         """
         try:
             logger.info(f"开始加载配置文件,查找browser_id: {self.browser_id}")
-            with open("config/config.json", "r") as f:
+            with open("config/config.json", "r", encoding="utf-8") as f:
                 configs = json.load(f)
                 # logger.info(f"配置文件内容: {configs}")
                 for config in configs:
@@ -156,7 +156,7 @@ class CityLineTicket:
         logger.info(f"{self.browser_id} 删除所有cookies")
         self.driver.delete_all_cookies()
         logger.info(f"{self.browser_id} 加载Cookies")
-        with open(f"user_cookies/cityline_cookies_{browser_id}.json", "r") as f:
+        with open(f"user_cookies/cityline_cookies_{browser_id}.json", "r", encoding="utf-8") as f:
             cookies = json.load(f)
             for cookie in cookies:
                 self.driver.add_cookie(cookie)
@@ -655,7 +655,7 @@ def _kill_chrome_processes(parent_pid):
 def main(max_workers):
     try:
         logger.info("加载配置文件")
-        with open("config/config.json", "r") as f:
+        with open("config/config.json", "r", encoding="utf-8") as f:
             configs = json.load(f)
         browser_ids = [item["browser_id"] for item in configs]
 
