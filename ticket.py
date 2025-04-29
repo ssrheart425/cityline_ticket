@@ -192,7 +192,7 @@ class CityLineTicket:
             try:
                 # 直接查找父级div中的按钮
                 parent_div = self.driver.find_element(By.CLASS_NAME, "buyTicketBox")
-                button_ids = ["buyTicketBtn", "buyTicketBtn1"]
+                button_ids = ["buyTicketBtn1", "buyTicketBtn"]
                 for button_id in button_ids:
                     try:
                         go_button = parent_div.find_element(By.XPATH, f".//*[@id='{button_id}']")
