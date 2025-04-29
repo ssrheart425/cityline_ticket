@@ -429,7 +429,6 @@ class CityLineTicket:
             )
             success = False
             error_messages = []
-            #
             # /html/body/section[1]/div[2]/div/div[2]/div[1]/div[3]/button[1]
             # /html/body/section[1]/div[2]/div/div[2]/div[1]/div[3]/button[2]
             for date in self.date:
@@ -720,7 +719,7 @@ def _preinit_chromedriver(retries=2):
 
 
 if __name__ == "__main__":
-    main(max_workers=2)
+    main(max_workers=7)
 
 
 # export http_proxy="http://127.0.0.1:7890"
